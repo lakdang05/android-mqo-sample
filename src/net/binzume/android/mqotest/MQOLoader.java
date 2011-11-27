@@ -110,14 +110,10 @@ public class MQOLoader {
 			GLUtils.texImage2D(GL10.GL_TEXTURE_2D, 0, bm, 0);
 
 			//テクスチャパラメータ
-			gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_MAG_FILTER, //拡大の時は
-				GL10.GL_LINEAR); //線形補間
-			gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_MIN_FILTER, //縮小の時は
-				GL10.GL_LINEAR); //線形補間
-			gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_WRAP_S, //UVがはみ出したとき
-				GL10.GL_CLAMP_TO_EDGE); //端っこで止める
-			gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_WRAP_T, //UVがはみ出したとき
-				GL10.GL_CLAMP_TO_EDGE); //端っこで止める
+			gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_MAG_FILTER, GL10.GL_LINEAR);
+			gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_MIN_FILTER, GL10.GL_LINEAR);
+			gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_WRAP_S, GL10.GL_CLAMP_TO_EDGE);
+			gl.glTexParameterf(GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_WRAP_T, GL10.GL_CLAMP_TO_EDGE);
 
 			Log.d("Texture", tex + " id:" + texId);
 		}
@@ -125,15 +121,19 @@ public class MQOLoader {
 
 	public static class MaterialMesh extends GLObject {
 		public int materialId;
-		//public FloatBuffer vartBuffer;
+
+		public float[] vertexArray;
+		public float[] uvArray;
+		public int vertexNum;
+
 		public short[] indicesArray;
 		public int indices;
-		public float[] uvArray;
 		public int uvs;
 
 		public MaterialMesh(int mat) {
 			materialId = mat;
 			indicesArray = new short[16 * 3];
+			vertexArray = new float[16 * 3];
 		}
 
 		public void addTriangle(short[] idxs, int offset) {
@@ -148,9 +148,24 @@ public class MQOLoader {
 			indicesArray[indices++] = idxs[2 + offset];
 		}
 
+		public void addTriangleV(float[] verts, int offset) {
+			if (vertexArray.length <= vertexNum * 3 + 9) {
+				float[] vertexArray2 = new float[vertexArray.length * 3 / 2 + 16]; // size*1.5
+				System.arraycopy(vertexArray, 0, vertexArray2, 0, vertexNum * 3);
+				vertexArray = vertexArray2;
+			}
+
+			System.arraycopy(verts, offset, vertexArray, vertexNum * 3, 3 * 3);
+			vertexNum += 3;
+
+		}
+
 		public void makeBuffer() {
 			indicesBuffer = ShortBuffer.wrap(indicesArray);
+			vartBuffer = FloatBuffer.wrap(vertexArray);
 			polyNum = indices / 3;
+			vartBuffer = FloatBuffer.wrap(vertexArray);
+			polyNum = vertexNum / 3;
 			indicesBuffer.position(0);
 			if (uvArray != null) {
 				uvBuffer = FloatBuffer.wrap(uvArray);
@@ -159,7 +174,7 @@ public class MQOLoader {
 
 		}
 
-		public void addUv(float[] uv, int vertnum) {
+		public void addUv(float[] uv, int vertnum, int offset) {
 
 			if (uvArray == null) {
 				uvArray = new float[indicesArray.length * 2 * 3 / 2];
@@ -171,7 +186,7 @@ public class MQOLoader {
 				uvArray = uvArray2;
 			}
 
-			System.arraycopy(uv, 0, uvArray, uvs * 2, vertnum * 2);
+			System.arraycopy(uv, offset, uvArray, uvs * 2, vertnum * 2);
 			uvs += vertnum;
 
 		}
@@ -253,11 +268,11 @@ public class MQOLoader {
 						Material mat = mqo.materials.get(mesh.materialId);
 						mesh.color(mat.r, mat.g, mat.b);
 						if (mat.tex == null) {
-							mesh.makeNormal();
+							//mesh.makeNormal();
 						}
 					} else {
 						mesh.color(object.mColor[0], object.mColor[1], object.mColor[2]);
-						mesh.makeNormal();
+						//mesh.makeNormal();
 					}
 
 					mqo.meshlist.add(mesh);
@@ -358,6 +373,7 @@ public class MQOLoader {
 
 		short index[] = new short[5];
 		float uv[] = new float[20];
+		float verts[] = new float[15];
 		String ns;
 		for (int i = 0; i < faces; i++) {
 			if ((ns = tokenizer.getToken()) == null)
@@ -372,6 +388,10 @@ public class MQOLoader {
 				int idx = tokenizer.getTokenInt(0);
 				//Log.d("mqo test", "idx: " + ns);
 				index[j] = (short) idx;
+
+				verts[j * 3 + 0] = object.vartBuffer.get(idx * 3 + 0);
+				verts[j * 3 + 1] = object.vartBuffer.get(idx * 3 + 1);
+				verts[j * 3 + 2] = object.vartBuffer.get(idx * 3 + 2);
 			}
 
 			// select material
@@ -399,10 +419,18 @@ public class MQOLoader {
 			}
 
 			if (n >= 3) {
-				mesh.addTriangle(index, 0);
+				//mesh.addTriangle(index, 0);
+				mesh.addTriangle(new short[] { (short) mesh.indices, (short) (mesh.indices + 1), (short) (mesh.indices + 2) }, 0);
+				mesh.addTriangleV(verts, 0);
 				if (n == 4) { // square
+					mesh.addTriangle(new short[] { (short) mesh.indices, (short) (mesh.indices + 1), (short) (mesh.indices + 2) }, 0);
 					index[4] = index[0];
-					mesh.addTriangle(index, 2);
+					verts[4 * 3 + 0] = verts[0];
+					verts[4 * 3 + 1] = verts[1];
+					verts[4 * 3 + 2] = verts[2];
+					mesh.addTriangleV(verts, 6);
+
+					//mesh.addTriangle(index, 2);
 				}
 			}
 
@@ -414,11 +442,11 @@ public class MQOLoader {
 				}
 
 				if (n >= 3) {
-					mesh.addUv(uv, 3);
+					mesh.addUv(uv, 3, 0);
 					if (n == 4) {
 						uv[8] = uv[0];
 						uv[9] = uv[1];
-						mesh.addUv(uv, 3); // todo:offset
+						mesh.addUv(uv, 3, 4); // todo:offset
 					}
 				}
 			}
@@ -430,7 +458,6 @@ public class MQOLoader {
 		Log.d("MQOLoader", "face ok :" + faces + " " + ns);
 
 		return list;
-
 	}
 
 	public static GLDrawable load(String path) {

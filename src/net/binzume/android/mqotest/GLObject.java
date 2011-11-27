@@ -13,13 +13,13 @@ import android.util.Log;
 public class GLObject implements GLDrawable.MeshObject {
 	public FloatBuffer vartBuffer;
 	public FloatBuffer normBuffer;
+	public FloatBuffer uvBuffer;
 	public int vartNum;
 	public ShortBuffer indicesBuffer;
-	public FloatBuffer uvBuffer;
 	public int polyNum;
 	public int vbo[];
 	public float mColor[];
-	public int texId = 1;
+	public int texId = -1;
 
 	public GLObject() {
 
@@ -113,7 +113,7 @@ public class GLObject implements GLDrawable.MeshObject {
 	}
 
 	public void draw(GL10 gl) {
-		if (uvBuffer != null) {
+		if (texId > 0 && uvBuffer != null) {
 			gl.glEnable(GL10.GL_TEXTURE_2D);
 			gl.glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 		} else {
@@ -127,7 +127,7 @@ public class GLObject implements GLDrawable.MeshObject {
 		gl.glEnableClientState(GL10.GL_VERTEX_ARRAY);
 		gl.glVertexPointer(3, GL10.GL_FLOAT, 0, vartBuffer);
 
-		if (uvBuffer != null) {
+		if (texId > 0 && uvBuffer != null) {
 			gl.glBindTexture(GL10.GL_TEXTURE_2D, texId);
 			gl.glEnableClientState(GL10.GL_TEXTURE_COORD_ARRAY);
 			gl.glTexCoordPointer(2, GL10.GL_FLOAT, 0, uvBuffer);
